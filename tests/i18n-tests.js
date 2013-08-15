@@ -6,6 +6,7 @@
 
 const assert = require('assert'),
       vows = require('vows'),
+      path = require('path'),
       i18n = require('../lib/i18n');
 
 var suite = vows.describe('i18n');
@@ -156,6 +157,230 @@ suite.addBatch({
     },
     "Matches partial locale": function(err, locale) {
       assert.equal(locale, "fil");
+    }
+  }
+});
+
+
+var makeResp = function(_locals) {
+  return {
+    locals: function(args, orValue) {
+      if ('string' === typeof args) {
+        _locals[args] = orValue;
+      } else {
+        Object.keys(args).forEach(function(key) {
+          _locals[key] = args[key];
+        });
+      }
+    }
+  };
+};
+suite.addBatch({
+  "i18n.abide middleware is setup": {
+    topic: function(){
+      var middleware = i18n.abide({});
+      var that = this;
+      var _locals = {};
+      var req = {
+        headers: {
+          'accept-language': "pl,fr-FR;q=0.3,en-US;q=0.1"
+        }
+      };
+      middleware(req, makeResp(_locals), function() {
+
+        // The request and response objects both get
+        // references to i18n related variables and fn
+        // Example: req.lang as well as _locals.lang
+        [req, _locals].forEach(function(obj){
+          assert.equal(obj.lang, 'en-US');
+          assert.equal(obj.locale, 'en_US');
+          assert.ok(obj.format);
+          assert.equal(typeof obj.format, 'function');
+          assert.ok(obj.setLocale);
+          assert.equal(typeof obj.setLocale, 'function');
+          assert.ok(obj.gettext);
+          assert.equal(typeof obj.gettext, 'function');
+        });
+
+        that.callback();
+      });
+    },
+    'gets a callback': function(err) {
+      assert.ok(! err);
+    }
+  }
+});
+
+suite.addBatch({
+  "i18n.abide middleware detects format conflict": {
+    topic: function(){
+      var middleware = i18n.abide({});
+      var that = this;
+      var _locals = {};
+      var req = {
+        headers: {
+          'accept-language': "pl,fr-FR;q=0.3,en-US;q=0.1"
+        },
+        // format from express-resource
+        format: function() {
+
+        }
+      };
+      _locals.format = req.format;
+      try {
+        console.log('== calling middleware');
+        middleware(req, makeResp(_locals), function() {
+          console.log('== calling  assert fail');
+          that.callback(new Error('We should have failed'));
+        });
+      } catch (e) {
+        this.callback();
+      }
+    },
+    'gets a callback': function(err) {
+      assert.ok(! err);
+    }
+  }
+});
+
+suite.addBatch({
+  "i18n.abide middleware allows re-naming the format fn": {
+    topic: function(){
+      var middleware = i18n.abide({
+        format_fn_name: 'i18nFormat'
+      });
+      var that = this;
+      var _locals = {};
+      var req = {
+        headers: {
+          'accept-language': "pl,fr-FR;q=0.3,en-US;q=0.1"
+        },
+        // format from express-resource
+        format: function(v) {
+          this.formatCalled = v;
+        }
+      };
+      _locals.format = req.format;
+      middleware(req, makeResp(_locals), function() {
+        // The request and response objects both get
+        // references to i18n related variables and fn
+        // Example: req.lang as well as _locals.lang
+
+        [req, _locals].forEach(function(obj){
+
+          assert.ok(obj.format);
+          assert.equal(typeof obj.format, 'function');
+
+          // Existing format is callable and functional
+          obj.format('foo');
+          assert.ok(obj.formatCalled, 'foo');
+
+          // Our renamed i18n.format is callable and functional
+          assert.ok(obj.i18nFormat);
+          assert.equal(typeof obj.i18nFormat, 'function');
+          var h = obj.i18nFormat("%s %s!", ["Hello", "World"]);
+          assert.equal(h, 'Hello World!');
+        });
+
+        that.callback();
+      });
+    },
+    'gets a callback': function(err) {
+      assert.ok(! err);
+    }
+  }
+});
+
+suite.addBatch({
+  "i18n.abide middleware correctly strips known langs from URLs": {
+    topic: function(){
+      var middleware = i18n.abide({
+        supported_languages: [ 'en', 'fr', 'de' ],
+        default_lang: 'en',
+        translation_type: 'key-value-json',
+        translation_directory: path.join(__dirname, 'locale'),
+        locale_on_url: true
+      });
+      var that = this;
+      var _locals = {};
+      var req = {
+        url: '/fr/',
+        headers: {}
+      };
+      middleware(req, makeResp(_locals), function() {
+        assert.equal(req.url, "/");
+        assert.equal(req.lang, "fr");
+        assert.equal(req.locale, "fr");
+        assert.equal(_locals.lang, "fr");
+        assert.equal(_locals.lang_dir, "ltr");
+        that.callback();
+      });
+    },
+    'gets a callback': function(err) {
+      assert.ok(! err);
+    }
+  }
+});
+
+suite.addBatch({
+  "i18n.abide middleware correctly leaves unknown langs on URLs": {
+    topic: function(){
+      var middleware = i18n.abide({
+        supported_languages: [ 'en', 'fr', 'de' ],
+        default_lang: 'en',
+        translation_type: 'key-value-json',
+        translation_directory: path.join(__dirname, 'locale'),
+        locale_on_url: true
+      });
+      var that = this;
+      var _locals = {};
+      var req = {
+        url: '/ru/',
+        headers: {}
+      };
+      middleware(req, makeResp(_locals), function() {
+        assert.equal(req.url, "/ru/");
+        assert.equal(req.lang, "en");
+        assert.equal(req.locale, "en");
+        assert.equal(_locals.lang, "en");
+        assert.equal(_locals.lang_dir, "ltr");
+        that.callback();
+      });
+    },
+    'gets a callback': function(err) {
+      assert.ok(! err);
+    }
+  }
+});
+
+suite.addBatch({
+  "i18n.abide middleware does the right thing with accept-language when locale_on_url is used": {
+    topic: function(){
+      var middleware = i18n.abide({
+        supported_languages: [ 'en', 'fr', 'de' ],
+        default_lang: 'en',
+        translation_type: 'key-value-json',
+        translation_directory: path.join(__dirname, 'locale'),
+        locale_on_url: true
+      });
+      var that = this;
+      var _locals = {};
+      var req = {
+        url: '/',
+        headers: {
+          'accept-language': 'ru;q=0.1'
+        }
+      };
+      middleware(req, makeResp(_locals), function() {
+        assert.equal(req.lang, "en");
+        assert.equal(req.locale, "en");
+        assert.equal(_locals.lang, "en");
+        assert.equal(_locals.lang_dir, "ltr");
+        that.callback();
+      });
+    },
+    'gets a callback': function(err) {
+      assert.ok(! err);
     }
   }
 });

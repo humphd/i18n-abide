@@ -1,7 +1,7 @@
 # i18n-abide
 
-This module **abides by the user's language preferences** and makes it
-available throughout the app.
+This module **abides by the user's language preferences** and makes it available
+throughout the app.
 
 This module **abides by the Mozilla L10n way of doing things**.
 
@@ -9,31 +9,30 @@ This module **abides by the Mozilla L10n way of doing things**.
 
 # Status
 
-This module is under development, but frozen parts of it power the [Mozilla Persona](https://github.com/mozilla/browserid) service in 40+ languages.
+Used in production systems, such as the
+[Mozilla Persona](https://github.com/mozilla/browserid) service in 40+
+languages.
 
-# Tutorial
+Also used on other websites including:
+* Mozilla Webmaker
 
-Mozilla Hacks blog has a three part introduction.
+# Supported Localization Technologies
 
-* [Localize Your Node.js Service](https://hacks.mozilla.org/2013/04/localize-your-node-js-service-part-1-of-3-a-node-js-holiday-season-part-9/)
-* [Localization community, tools & process](https://hacks.mozilla.org/2013/04/localization-community-tools-process-part-2-of-3-a-node-js-holiday-season-part-10/)
-* [Localization in Action](https://hacks.mozilla.org/2013/04/localization-in-action-part-3-of-3-a-node-js-holiday-season-part-11/)
+This module supports several localization backends:
+* Gettext PO files (default and documented below)
+* Plist files
+* Transflex key-value-JSON files
 
-# Pre-requisites for Developers
-
-`npm install` has got your back
-
-# Pre-requisites for String Wranglers
-
-You should install Gnu gettext to get msginit, xgettext, and other tools.
-
-What is a string wrangler? A person or an automated build process that will merge and delete strings between releases.
+This module supports client side as well as server side localization.
 
 # Usage
 
     npm install i18n-abide
 
-In your app where you setup express or connect:
+In this README, we'll use express and EJS templates, but other
+integrations are possible.
+
+In your app where you setup express:
 
     var i18n = require('i18n-abide');
 
@@ -44,20 +43,14 @@ In your app where you setup express or connect:
       translation_directory: 'i18n'
     }));
 
-This block sets up the middleware and views with gettext support. We declare
-support for English, German, Spanish, and two debug locales (more on this later).
+This block sets up the middleware and views with gettext support.
+We declare support for English, German, Spanish, and two debug locales
+(more on this later).
 
-In your routes, you can use the gettext function in ``.js`` files.
+In your routes, you can use the gettext function in `.js` files.
 
     exports.homepage = function(req, resp) {
       resp.render('home', {title: req.gettext("Hey, careful, man, there's a beverage here!")});
-    };
-
-You can set locale in the scope of per-request instead of letting ``i18n-abide`` decide the locale for you. The following example shows how to set the locale of the request to ``zh_TW`` (Traditional Chinese): 
-
-    exports.homepage = function(req, resp) {
-      req.setLocale('zh_TW');
-      resp.render('home', {title: "my title"});
     };
 
 In your layout files, you can add
@@ -68,89 +61,83 @@ In your layout files, you can add
         <meta charset="utf-8">
         ...
 
-In your templates files, you can use the gettext function in ``.ejs`` files:
+In your templates files, you can use the gettext function in `.ejs` files:
 
     <p><%= gettext("This will not stand, ya know, this aggression will not stand, man.") %></p>
 
-i18n-abide also provides a ``format`` function for string interpolation.
+i18n-abide also provides a `format` function for string interpolation.
 
-These are both server side translations and client side translations. Server side works out of the box
-and is the most common use case.
+This module provides both server side translations and client side translations.
+Server side works out of the box and is the most common use case.
 
 If you also want to do client-side translations,
-i18n-abide provides ``lib/gettext.js`` and you can do the same in ``.js`` and ``.ejs`` files.
+i18n-abide provides `lib/gettext.js` and you can do the same in `.js` and
+`.ejs` files.
 
-## Setup Gettext
+## Setting Language via HTTP Header
 
-    $ mkdir -p locale/templates/LC_MESSAGES
-    $ ./node_modules/.bin/extract-pot --locale locale .
+The `i18n-abide` module uses the
+[`accept-language` HTTP header](http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.4)
+to determine which language to use.
 
-If you look in ``locale/templates/LC_MESSAGES/messages.pot`` you will see your strings have been extracted.
-Edit this file and make sure ``charset`` is set to ``UTF-8``.
+See [API docs](./docs/API.md) for overriding this via URL or the API directly.
 
-If there are certain files or directories you want to exclude, use `--exclude` one or more times. Example:
+## Translation files
 
-    $ extract-pot --locale locale . --exclude tests --exclude examples
+The `i18n-abide` module currently supports three file formats.
 
-Example messages.pot:
+1) PO/POT files, which get transformed to JSON via provided command line tools.
 
-    "Content-Type: text/plain; charset=UTF-8\n"
-    "Content-Transfer-Encoding: 8bit\n"
+2) [PLIST](https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man5/plist.5.html) (i.e., XML)
+files, which require no transformation prior to use.
 
-    #: ./routes.js:81
-    msgid "Hey, careful, man, there's a beverage here!"
-    msgstr ""
+3) [Transflex](http://support.transifex.com/customer/portal/articles/1223004-key-value-json-files) [JSON](https://developer.mozilla.org/en/docs/JSON)
+(JavaScript Object Notation) a key-value JSON type,
+which require no transformation prior to use.
 
-    #: views/404.ejs:5
-    msgid "This will not stand, ya know, this aggression will not stand, man."
-    msgstr ""
+### PO/POT files
 
-To create ``po`` files in bulk, do:
+This is the default and assumed for documentation in this README.
 
-    $ for l in en_US de es db_LB; do
-        mkdir -p locale/${l}/LC_MESSAGES/
-        msginit --input=./locale/templates/LC_MESSAGES/messages.pot \
-                --output-file=./locale/${l}/LC_MESSAGES/messages.po \
-                -l ${l}
-      done
+PO files can be compiled to .json or Gettext binary `.mo` files.
 
-If you look at ``locale/en_US/LC_MESSAGES/messages.po``, it will be very similar to your template messages.pot file.
+For use on the client side,
+PO files are compiled to JavaScript for easy inclusion into your page or build
+script.
 
-This creates ``.po`` files which you can give to localizers to translate your copy.
+NOTE: The PO/POT files are also transformed into .JSON,
+but do not follow the same layout as the Transflex JSON files.
 
-Let's put the i18n-abide tools in our path:
+See [GETTEXT.md](docs/GETTEXT.md) for more details.
 
-    $ export PATH=$PATH:node_modules/i18n-abide/bin
+### Other file formats
 
-And run a string merge:
+See [API](docs/API.md) for configuration and details around using Plist or Transflex localization files.
 
-    $ merge_po.sh ./locale
-
-A merge takes strings from our ``.pot`` files and pushes them into our ``.po`` files. If you have ``podebug`` installed, it also automatically translates ``db-LB``.
 
 # Debugging and Testing
 
-``db-LB`` is a special
-**debug** locale. To trigger it, set your Browser or Operating System language to Italian (Switzerland) which is ``it-CH``.  This fake locale ``db-LB`` will be triggered, it is David Bowie speak for the region of Labyrinth. Oh, hell ya a Dude / Bowie Mashup.
+`db-LB` is a special **debug** locale.
+To trigger it, set your Browser or Operating System language to Italian
+(Switzerland) which is `it-CH`.
+This fake locale `db-LB` will be triggered,
+it is David Bowie speak for the region of Labyrinth.
+
+Oh, hell ya a "The Dude" / Bowie Mashup.
 That just happened.
 
-Example: ``locale/db_LB/LC_MESSAGES/messages.po``
+Now,
+start up your Node server and visit a page you've wrapped strings in Gettext...
 
-    "Content-Type: text/plain; charset=UTF-8\n"
-    "Content-Transfer-Encoding: 8bit\n"
+# Tutorial
 
-    #: routes.js:81
-    msgid "Hey, careful, man, there's a beverage here!"
-    msgstr "‮Hǝʎ´ ɔɐɹǝɟnʅ´ ɯɐu´ ʇɥǝɹǝ,s ɐ qǝʌǝɹɐƃǝ ɥǝɹǝ¡"
+Mozilla Hacks blog has a three part introduction.
 
-    #: views/404.ejs:5
-    msgid "This will not stand, ya know, this aggression will not stand, man."
-    msgstr "‮⊥ɥıs ʍıʅʅ uoʇ sʇɐup´ ʎɐ ʞuoʍ´ ʇɥıs ɐƃƃɹǝssıou ʍıʅʅ uoʇ sʇɐup´ ɯɐu·"
+* [Localize Your Node.js Service](https://hacks.mozilla.org/2013/04/localize-your-node-js-service-part-1-of-3-a-node-js-holiday-season-part-9/)
+* [Localization community, tools & process](https://hacks.mozilla.org/2013/04/localization-community-tools-process-part-2-of-3-a-node-js-holiday-season-part-10/)
+* [Localization in Action](https://hacks.mozilla.org/2013/04/localization-in-action-part-3-of-3-a-node-js-holiday-season-part-11/)
 
-And we will compile ``.po`` files into ``.mo`` files.
-
-    $ compile_mo.sh locale/
-
-Now, start up your Node server and visit a page you've wrapped strings in Gettext...
-
-See docs/USAGE.md for full details.
+# Docs
+* See [USAGE](./docs/USAGE.md) for full details.
+* [API docs](./docs/API.md) has more advanced config options and APIs
+* [GETTEXT](./docs/GETTEXT.md) documents how to use PO/POT files
